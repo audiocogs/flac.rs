@@ -1,0 +1,14 @@
+[package]
+name = "flac"
+version = "0.0.1"
+authors = ["Jens Nockert <jens@nockert.se>"]
+
+[features]
+complete-tests = []
+
+[lib]
+name = "flac"
+path = "src/flac.rs"
+
+[dependencies.aurora]
+path = "../aurora.rs"
