@@ -11,4 +11,4 @@ name = "flac"
 path = "src/flac.rs"
 
 [dependencies.aurora]
-path = "../aurora.rs"
+git = "https://github.com/audiocogs/aurora.rs"
