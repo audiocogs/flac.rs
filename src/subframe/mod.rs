@@ -107,6 +107,20 @@ impl VerbatimSubframe {
   }
 }
 
+pub fn read(frame_header: &::frame::header::Header, bitstream: &mut aurora::stream::Bitstream) -> Vec<u32> {
+  let header = Header::from(bitstream);
+
+  match header.ty {
+    Verbatim => {
+      let subframe = VerbatimSubframe::from(frame_header, bitstream);
+
+      return subframe.subblocks;
+    },
+    _ => {
+      fail!("Unsupported");
+    }
+  }
+}
 
 #[test]
 fn test_header_from_1() {

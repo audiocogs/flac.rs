@@ -3,14 +3,14 @@ use aurora;
 pub mod stream_info;
 
 #[deriving(Show,PartialEq)]
-enum Ty {
+pub enum Ty {
   StreamInfo(stream_info::StreamInfo), Unknown
 }
 
 #[deriving(Show,PartialEq)]
 pub struct Metadata {
-  ty: Ty,
-  data: Vec<u8>
+  pub ty: Ty,
+  pub data: Vec<u8>
 }
 
 impl aurora::Initialize for Metadata {

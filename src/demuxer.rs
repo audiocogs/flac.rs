@@ -28,12 +28,6 @@ impl Demuxer {
       fail!("flac::Demuxer: Stream did not start with fourcc 'fLaC' had bytes {:x}{:x}{:x}{:x} (INPUT)", fourcc[0], fourcc[1], fourcc[2], fourcc[3]);
     }
 
-    let stream_info_type = stream.read_u8();
-
-    if stream_info_type & 0x7F != 0 {
-      fail!("flac::Demuxer: First METADATA_BLOCK was not STREAMINFO (INPUT)");
-    }
-
     let mut last = false;
 
     while !last {
@@ -42,12 +36,23 @@ impl Demuxer {
       });
     }
 
-    last = true; // TODO: Actually write data;
+    last = false;
 
     let sink = &mut self.sink;
 
     while !last {
-      sink.write(|_| {
+      sink.write(|binary| {
+        binary.data.grow(4096, 0);
+
+        match stream.try_read(binary.data.as_mut_slice()) {
+          Some(n) => binary.data.truncate(n),
+          None => {
+            binary.data.truncate(0);
+            last = true;
+          }
+        };
+
+        binary.last = last;
       });
     }
   }
@@ -91,7 +96,7 @@ mod complete_tests {
     });
 
     // let audio = flac.audioStream();
-    // 
+    //
     // assert_eq!(audio.read_be_u16(), 0xFFF8)
   }
 }
