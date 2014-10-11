@@ -256,3 +256,28 @@ fn test_header_from_3() {
   assert_eq!(header.frame_number, Some(2));
   assert_eq!(header.crc, 0xCC);
 }
+
+#[test]
+fn test_header_from_bad_apple_verbatim_1() {
+  let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
+
+  spawn(proc() {
+    let path = std::path::Path::new("./test-vectors/frames/bad_apple_verbatim.1");
+    let file = std::io::File::open(&path).unwrap();
+
+    aurora::file::Input::new(file, 4096, sink_0).run();
+  });
+
+  let mut stream = aurora::stream::Stream::new(&mut source_0);
+  let mut bitstream = aurora::stream::Bitstream::new(&mut stream);
+
+  let header = Header::from(&mut bitstream);
+
+  assert_eq!(header.variable_blocksize, false);
+  assert_eq!(header.block_size, 1152);
+  assert_eq!(header.sample_rate, 44100);
+  assert_eq!(header.channel_assignment, 1);
+  assert_eq!(header.sample_size, 16);
+  assert_eq!(header.frame_number, Some(0));
+  assert_eq!(header.crc, 0xAE);
+}
