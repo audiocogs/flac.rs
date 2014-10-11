@@ -105,3 +105,23 @@ fn test_header_from_3() {
   assert_eq!(header.ty, LPC(1));
   assert_eq!(header.wasted_bits, 0);
 }
+
+#[test]
+fn test_header_from_bad_apple_verbatim_1() {
+  let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
+
+  spawn(proc() {
+    let path = std::path::Path::new("./test-vectors/subframes/bad_apple_verbatim.1");
+    let file = std::io::File::open(&path).unwrap();
+
+    aurora::file::Input::new(file, 4096, sink_0).run();
+  });
+
+  let mut stream = aurora::stream::Stream::new(&mut source_0);
+  let mut bitstream = aurora::stream::Bitstream::new(&mut stream);
+
+  let header = Header::from(&mut bitstream);
+
+  assert_eq!(header.ty, Verbatim);
+  assert_eq!(header.wasted_bits, 0);
+}
