@@ -23,20 +23,36 @@ mod tests {
 
   #[test]
   fn test_from_1() {
-    let path = std::path::Path::new("./test-vectors/metadata/bad_apple.stream_info");
-    let mut s = aurora::file::FileStream::new(std::io::File::open(&path).unwrap());
+    let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
 
-    let si = super::Unknown::from(&mut s);
+    spawn(proc() {
+      let path = std::path::Path::new("./test-vectors/metadata/bad_apple.stream_info");
+      let file = std::io::File::open(&path).unwrap();
+
+      aurora::file::Input::new(file, 4096, sink_0).run();
+    });
+    
+    let mut stream = aurora::stream::Stream::new(&mut source_0);
+
+    let si = super::Unknown::from(&mut stream);
 
     assert_eq!(si.data.len(), 34);
   }
 
   #[test]
   fn test_from_2() {
-    let path = std::path::Path::new("./test-vectors/metadata/bad_apple.vorbis_comment");
-    let mut s = aurora::file::FileStream::new(std::io::File::open(&path).unwrap());
+    let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
 
-    let si = super::Unknown::from(&mut s);
+    spawn(proc() {
+      let path = std::path::Path::new("./test-vectors/metadata/bad_apple.vorbis_comment");
+      let file = std::io::File::open(&path).unwrap();
+
+      aurora::file::Input::new(file, 4096, sink_0).run();
+    });
+    
+    let mut stream = aurora::stream::Stream::new(&mut source_0);
+
+    let si = super::Unknown::from(&mut stream);
 
     assert_eq!(si.data.len(), 315);
   }
