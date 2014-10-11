@@ -87,6 +87,27 @@ impl LPCSubframe {
   }
 }
 
+#[deriving(Show,PartialEq)]
+pub struct VerbatimSubframe {
+  subblocks: Vec<u32>
+}
+
+impl VerbatimSubframe {
+  pub fn from(frame_header: &::frame::header::Header, stream: &mut aurora::stream::Bitstream) -> VerbatimSubframe {
+    let bits_per_sample = frame_header.sample_size;
+    let block_size = frame_header.block_size;
+
+    let mut subblocks = Vec::new();
+
+    for _ in range(0, block_size) {
+      subblocks.push(stream.read_n(bits_per_sample as uint));
+    }
+
+    return VerbatimSubframe { subblocks: subblocks };
+  }
+}
+
+
 #[test]
 fn test_header_from_1() {
   let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
@@ -150,6 +171,7 @@ fn test_header_from_3() {
 #[test]
 fn test_header_from_bad_apple_verbatim_1() {
   let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
+  let (sink_r, mut source_r) = aurora::channel::create::<aurora::Binary>(1);
 
   spawn(proc() {
     let path = std::path::Path::new("./test-vectors/subframes/bad_apple_verbatim.1");
@@ -161,8 +183,38 @@ fn test_header_from_bad_apple_verbatim_1() {
   let mut stream = aurora::stream::Stream::new(&mut source_0);
   let mut bitstream = aurora::stream::Bitstream::new(&mut stream);
 
-  let header = Header::from(&mut bitstream);
+  let header = ::frame::header::Header {
+    variable_blocksize: false,
+    block_size: 1152,
+    sample_rate: 44100,
+    channel_assignment: 1,
+    sample_size: 16,
+    sample_number: None,
+    frame_number: Some(0),
+    crc: 0xAE
+  };
 
-  assert_eq!(header.ty, Verbatim);
-  assert_eq!(header.wasted_bits, 0);
+  let subframe_header = Header::from(&mut bitstream);
+
+  assert_eq!(subframe_header.ty, Verbatim);
+  assert_eq!(subframe_header.wasted_bits, 0);
+
+  let subframe = VerbatimSubframe::from(&header, &mut bitstream);
+
+  spawn(proc() {
+    let decoded_path = std::path::Path::new("./test-vectors/subframes/bad_apple_verbatim.1.decoded");
+    let decoded_file = std::io::File::open(&decoded_path).unwrap();
+
+    aurora::file::Input::new(decoded_file, 4096, sink_r).run();
+  });
+
+  let mut reference_stream = aurora::stream::Stream::new(&mut source_r);
+
+  for i in range(0, 1152) {
+    let reference_sample = reference_stream.read_be_u16();
+    let decoded_sample = subframe.subblocks[i];
+
+    assert_eq!(decoded_sample, reference_sample as u32);
+  }
+
 }
