@@ -46,6 +46,47 @@ impl Header {
   }
 }
 
+#[deriving(Show,PartialEq)]
+pub struct LPCSubframe {
+  warmup: Vec<uint>,
+  precision: u8,
+  shift: i8,
+  coefficients: Vec<int>
+}
+
+impl LPCSubframe {
+  pub fn from(frame_header: &::frame::header::Header, subframe_header: &Header, stream: &mut aurora::stream::Bitstream) -> LPCSubframe {
+    let bits_per_sample = frame_header.sample_size;
+    let order = match subframe_header.ty {
+      LPC(n) => n,
+      _ => fail!("Cannot extract order from non LPC subframe")
+    };
+
+    let mut warmup = Vec::new();
+
+    for _ in range(0, order) {
+      warmup.push(stream.read_n(bits_per_sample as uint) as uint);
+    }
+
+    let precision = stream.read_n(4) as u8;
+
+    let shift = stream.read_n_signed(5) as i8;
+
+    let mut coefficients = Vec::new();
+
+    for _ in range(0, order) {
+      coefficients.push(stream.read_n_signed(precision as uint) as int);
+    }
+
+    return LPCSubframe {
+      warmup: warmup,
+      precision: precision,
+      shift: shift,
+      coefficients: coefficients
+    };
+  }
+}
+
 #[test]
 fn test_header_from_1() {
   let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
