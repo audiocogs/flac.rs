@@ -39,88 +39,44 @@ pub struct StreamInfo {
   pub signature: MD5
 }
 
-impl StreamInfo {
-  pub fn transfer(stream: &mut aurora::stream::Stream, result: &mut StreamInfo) {
-    let length = stream.read_be_uint_n(3);
-
-    if length != 34 {
-      fail!("StreamInfo: Length of block isn't 34, which it should be (INPUT)");
-    }
-
-    result.block_size = (stream.read_be_u16(), stream.read_be_u16());
-    result.frame_size = (stream.read_be_uint_n(3) as u32, stream.read_be_uint_n(3) as u32);
-
-    let ex = stream.read_be_u64();
-
-    result.sample_rate =     ((ex & 0xFFFFF00000000000) >> 44) as u32;
-    result.channels =        ((ex & 0x00000E0000000000) >> 41) as u8 + 1;
-    result.bits_per_sample = ((ex & 0x000001F000000000) >> 36) as u8 + 1;
-    result.samples =          (ex & 0x0000000FFFFFFFFF) >> 0;
-
-    let mut sig = [0x00u8, ..16];
-
-    stream.read(&mut sig);
-
-    result.signature = MD5(sig);
-  }
-}
-
-impl aurora::Initialize for StreamInfo {
-  fn initialize() -> StreamInfo {
-    return StreamInfo {
-      block_size: (0, 0),
-      frame_size: (0, 0),
-      sample_rate: 0,
-      channels: 0,
-      bits_per_sample: 0,
-      samples: 0,
-      signature: MD5([0, ..16])
-    }
+pub fn read(data: &Vec<u8>) -> StreamInfo {
+  if data.len() != 34 {
+    fail!("StreamInfo: Length of block isn't 37, which it should be (INPUT)");
   }
 
-  fn reinitialize(&mut self) {
-    self.block_size = (0, 0);
-    self.frame_size = (0, 0);
-    self.sample_rate = 0;
-    self.channels = 0;
-    self.bits_per_sample = 0;
-    self.samples = 0;
-    self.signature = MD5([0, ..16]);
-  }
-}
+  let data = data.as_slice().to_vec();
 
-#[cfg(test)]
-mod tests {
-  use std;
-  use aurora;
+  let (sink, mut source) = aurora::channel::create::<aurora::Binary>(1);
 
-  #[test]
-  fn test_from() {
-    let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
+  spawn(proc() {
+    aurora::buffer::Buffer::new(data, 4096, sink).run();
+  });
 
-    spawn(proc() {
-      let path = std::path::Path::new("./test-vectors/metadata/bad_apple.stream_info");
-      let file = std::io::File::open(&path).unwrap();
+  let mut stream = aurora::stream::Stream::new(&mut source);
 
-      aurora::file::Input::new(file, 4096, sink_0).run();
-    });
-    
-    let mut stream = aurora::stream::Stream::new(&mut source_0);
+  let block_size = (stream.read_be_u16(), stream.read_be_u16());
+  let frame_size = (stream.read_be_uint_n(3) as u32, stream.read_be_uint_n(3) as u32);
 
-    let mut stream_info: super::StreamInfo = aurora::Initialize::initialize();
-    
-    super::StreamInfo::transfer(&mut stream, &mut stream_info);
+  let ex = stream.read_be_u64();
 
-    let canonical = super::StreamInfo {
-      block_size: (4096, 4096),
-      frame_size: (1324, 13848),
-      sample_rate: 44100,
-      channels: 2,
-      bits_per_sample: 16,
-      samples: 13940634,
-      signature: super::MD5([0x07, 0x02, 0x55, 0xE5, 0xCE, 0x94, 0x69, 0xED, 0xC6, 0x23, 0xCD, 0x9E, 0x8E, 0xB3, 0xE2, 0x21])
-    };
+  let sample_rate =     ((ex & 0xFFFFF00000000000) >> 44) as u32;
+  let channels =        ((ex & 0x00000E0000000000) >> 41) as u8 + 1;
+  let bits_per_sample = ((ex & 0x000001F000000000) >> 36) as u8 + 1;
+  let samples =          (ex & 0x0000000FFFFFFFFF) >> 0;
 
-    assert_eq!(stream_info, canonical);
-  }
+  let mut sig = [0x00u8, ..16];
+
+  stream.read(&mut sig);
+
+  let signature = MD5(sig);
+
+  return StreamInfo {
+    block_size: block_size,
+    frame_size: frame_size,
+    sample_rate: sample_rate,
+    channels: channels,
+    bits_per_sample: bits_per_sample,
+    samples: samples,
+    signature: signature
+  };
 }

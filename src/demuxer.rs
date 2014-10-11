@@ -5,11 +5,11 @@ use metadata;
 pub struct Demuxer {
   source: aurora::channel::Source<aurora::Binary>,
   sink: aurora::channel::Sink<aurora::Binary>,
-  metadata_sink: aurora::channel::Sink<metadata::stream_info::StreamInfo>
+  metadata_sink: aurora::channel::Sink<metadata::Metadata>
 }
 
 impl Demuxer {
-  pub fn new(source: aurora::channel::Source<aurora::Binary>, sink: aurora::channel::Sink<aurora::Binary>, metadata_sink: aurora::channel::Sink<metadata::stream_info::StreamInfo>) -> Demuxer {
+  pub fn new(source: aurora::channel::Source<aurora::Binary>, sink: aurora::channel::Sink<aurora::Binary>, metadata_sink: aurora::channel::Sink<metadata::Metadata>) -> Demuxer {
     return Demuxer {
       source: source,
       sink: sink,
@@ -34,28 +34,12 @@ impl Demuxer {
       fail!("flac::Demuxer: First METADATA_BLOCK was not STREAMINFO (INPUT)");
     }
 
-    self.metadata_sink.write(|metadata| {
-      metadata::stream_info::StreamInfo::transfer(&mut stream, metadata);
-    });
-
-    let mut last = stream_info_type & 0x80 != 0;
+    let mut last = false;
 
     while !last {
-      let block_type = stream.read_u8();
-
-      last = block_type & 0x80 != 0;
-
-      match block_type & 0x7F {
-        0 => {
-          fail!("flac::Demuxer: Multiple STREAMINFO (INPUT)")
-        },
-        n if n < 127 => {
-          let _ = metadata::unknown::Unknown::from(&mut stream);
-        }
-        n => {
-          fail!("flac::Demuxer: METADATA_BLOCK BLOCK_TYPE is {}, which is invalid (INPUT)", n)
-        }
-      }
+      self.metadata_sink.write(|metadata| {
+        last = metadata::transfer(&mut stream, metadata);
+      });
     }
 
     last = true; // TODO: Actually write data;
@@ -79,7 +63,7 @@ mod complete_tests {
   fn test_new() {
     let (sink_0, source_0) = aurora::channel::create::<aurora::Binary>(1);
     let (sink_1, _) = aurora::channel::create::<aurora::Binary>(1);
-    let (sink_si, mut source_si) = aurora::channel::create::<metadata::stream_info::StreamInfo>(1);
+    let (sink_md, mut source_md) = aurora::channel::create::<metadata::Metadata>(1);
 
     spawn(proc() {
       let path = std::path::Path::new("./test-vectors/complete/bad_apple.flac");
@@ -89,10 +73,10 @@ mod complete_tests {
     });
 
     spawn(proc() {
-      super::Demuxer::new(source_0, sink_1, sink_si).run();
+      super::Demuxer::new(source_0, sink_1, sink_md).run();
     });
 
-    source_si.read(|stream_info| {
+    source_md.read(|metadata| {
       let canonical = &metadata::stream_info::StreamInfo {
         block_size: (4096, 4096),
         frame_size: (1324, 13848),
@@ -103,7 +87,7 @@ mod complete_tests {
         signature: metadata::stream_info::MD5([0x07, 0x02, 0x55, 0xE5, 0xCE, 0x94, 0x69, 0xED, 0xC6, 0x23, 0xCD, 0x9E, 0x8E, 0xB3, 0xE2, 0x21])
       };
 
-      assert_eq!(stream_info, canonical);
+      assert_eq!(stream_info.ty, metadata::StreamInfo(canonical));
     });
 
     // let audio = flac.audioStream();
