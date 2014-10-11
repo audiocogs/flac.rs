@@ -1,3 +1,4 @@
+use std;
 use aurora;
 
 const SYNC_CODE: u16 = 0b11111111111110;
@@ -33,7 +34,7 @@ impl Header {
 
     let channel_assignment = stream.read_n(4) as u8;
 
-    let sample_size = stream.read_n(3) as u8;
+    let sample_size = Header::finalize_sample_size(stream.read_n(3) as u8);
 
     if stream.read_n(1) != 0 {
       fail!("Reserved bit in frame header must be 0");
@@ -113,6 +114,20 @@ impl Header {
     }
   }
 
+  fn finalize_sample_size(sample_size_code: u8) -> u8 {
+    match sample_size_code {
+      0b000 => fail!("TODO: get from STREAMINFO metadata block"),
+      0b001 => 8,
+      0b010 => 12,
+      0b011 => fail!("flac::Decoder: Reserved sample size (INPUT)"),
+      0b100 => 16,
+      0b101 => 20,
+      0b110 => 24,
+      0b111 => fail!("flac::Decoder: Reserved sample size (INPUT)"),
+      _ => fail!("flac::Decoder: Undefined input?! (BUG)")
+    }
+  }
+
 }
 
 // See http://en.wikipedia.org/wiki/UTF-8
@@ -165,4 +180,79 @@ fn test_utf8_decoding_of_four_bytes() {
   let decoded = decode_sample_or_frame_number(&mut bitstream);
 
   assert_eq!(decoded, 0b000100100101101100010);
+}
+
+#[test]
+fn test_header_from_1() {
+  let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
+
+  spawn(proc() {
+    let path = std::path::Path::new("./test-vectors/frames/bad_apple.1");
+    let file = std::io::File::open(&path).unwrap();
+
+    aurora::file::Input::new(file, 4096, sink_0).run();
+  });
+
+  let mut stream = aurora::stream::Stream::new(&mut source_0);
+  let mut bitstream = aurora::stream::Bitstream::new(&mut stream);
+
+  let header = Header::from(&mut bitstream);
+
+  assert_eq!(header.variable_blocksize, false);
+  assert_eq!(header.block_size, 4096);
+  assert_eq!(header.sample_rate, 44100);
+  assert_eq!(header.channel_assignment, 1);
+  assert_eq!(header.sample_size, 16);
+  assert_eq!(header.frame_number, Some(0));
+  assert_eq!(header.crc, 0xC2);
+}
+
+#[test]
+fn test_header_from_2() {
+  let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
+
+  spawn(proc() {
+    let path = std::path::Path::new("./test-vectors/frames/bad_apple.2");
+    let file = std::io::File::open(&path).unwrap();
+
+    aurora::file::Input::new(file, 4096, sink_0).run();
+  });
+
+  let mut stream = aurora::stream::Stream::new(&mut source_0);
+  let mut bitstream = aurora::stream::Bitstream::new(&mut stream);
+
+  let header = Header::from(&mut bitstream);
+
+  assert_eq!(header.variable_blocksize, false);
+  assert_eq!(header.block_size, 4096);
+  assert_eq!(header.sample_rate, 44100);
+  assert_eq!(header.channel_assignment, 1);
+  assert_eq!(header.sample_size, 16);
+  assert_eq!(header.frame_number, Some(1));
+  assert_eq!(header.crc, 0xC5);
+}
+
+#[test]
+fn test_header_from_3() {
+  let (sink_0, mut source_0) = aurora::channel::create::<aurora::Binary>(1);
+
+  spawn(proc() {
+    let path = std::path::Path::new("./test-vectors/frames/bad_apple.3");
+    let file = std::io::File::open(&path).unwrap();
+
+    aurora::file::Input::new(file, 4096, sink_0).run();
+  });
+
+  let mut stream = aurora::stream::Stream::new(&mut source_0);
+  let mut bitstream = aurora::stream::Bitstream::new(&mut stream);
+
+  let header = Header::from(&mut bitstream);
+
+  assert_eq!(header.variable_blocksize, false);
+  assert_eq!(header.block_size, 4096);
+  assert_eq!(header.sample_rate, 44100);
+  assert_eq!(header.channel_assignment, 1);
+  assert_eq!(header.sample_size, 16);
+  assert_eq!(header.frame_number, Some(2));
+  assert_eq!(header.crc, 0xCC);
 }
