@@ -1,0 +1,20 @@
+[root]
+name = "flac-player"
+version = "0.0.1"
+dependencies = [
+ "aurora 0.0.1 (git+https://github.com/audiocogs/aurora.rs#ecfff317c3064a20cfd8cfbb392d13aa6108e357)",
+ "flac 0.0.1",
+]
+
+[[package]]
+name = "aurora"
+version = "0.0.1"
+source = "git+https://github.com/audiocogs/aurora.rs#ecfff317c3064a20cfd8cfbb392d13aa6108e357"
+
+[[package]]
+name = "flac"
+version = "0.0.1"
+dependencies = [
+ "aurora 0.0.1 (git+https://github.com/audiocogs/aurora.rs#ecfff317c3064a20cfd8cfbb392d13aa6108e357)",
+]
+

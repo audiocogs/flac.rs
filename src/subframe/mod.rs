@@ -46,26 +46,94 @@ impl Header {
   }
 }
 
+fn decode_residuals(frame_header: &::frame::header::Header, stream: &mut aurora::stream::Bitstream) -> Vec<u32> {
+  let residual_coding_method = stream.read_n(2);
+
+  if residual_coding_method > 1 {
+    fail!("Non-compliant residual coding method {}", residual_coding_method);
+  }
+
+  let partition_order = stream.read_n(4) as uint;
+
+  let n_samples = frame_header.block_size as uint >> partition_order;
+
+  if partition_order > n_samples {
+    fail!("Invalid predictor order");
+  }
+
+  let mut subblocks = Vec::new();
+
+  for partition in range(0u, 1 << partition_order) {
+    let n_bits = if residual_coding_method == 0 { 4 } else { 5 };
+    let tmp = stream.read_n(n_bits) as uint;
+
+    let escape_code = if residual_coding_method == 0 { 0b1111 } else { 0b11111 };
+    if tmp == escape_code {
+      let tmp = stream.read_n(5) as uint;
+
+      for i in range(0, n_samples) {
+        if partition == 0 && i < partition_order {
+          subblocks.push(0);
+        } else {
+          subblocks.push(stream.read_n_signed(tmp) as u32);
+        }
+      }
+    } else {
+      for i in range(0, n_samples) {
+        if partition == 0 && i < partition_order {
+          subblocks.push(0);
+        } else {
+          subblocks.push(decode_golomb(stream, tmp));
+        }
+      }
+    }
+  }
+
+  return subblocks;
+}
+
+fn decode_golomb(stream: &mut aurora::stream::Bitstream, parameter: uint) -> u32 {
+  let mut msbs = 0;
+
+  loop {
+    if stream.read_n(1) == 0b1 {
+      break;
+    }
+
+    msbs += 1
+  }
+  
+  let lsbs = stream.read_n(parameter);
+  
+  let uval = ((msbs << parameter) | lsbs) >> 1;
+  
+  if uval & 1 == 0 {
+    return -(uval as i32) as u32 - 1 ;
+  } else {
+    return uval;
+  }
+}
+
 #[deriving(Show,PartialEq)]
 pub struct LPCSubframe {
   warmup: Vec<uint>,
   precision: u8,
   shift: i8,
-  coefficients: Vec<int>
+  coefficients: Vec<i32>
 }
 
 impl LPCSubframe {
-  pub fn from(frame_header: &::frame::header::Header, subframe_header: &Header, stream: &mut aurora::stream::Bitstream) -> LPCSubframe {
+  pub fn from(frame_header: &::frame::header::Header, subframe_header: &Header, stream: &mut aurora::stream::Bitstream) -> Vec<u32> {
     let bits_per_sample = frame_header.sample_size;
     let order = match subframe_header.ty {
       LPC(n) => n,
       _ => fail!("Cannot extract order from non LPC subframe")
     };
 
-    let mut warmup = Vec::new();
+    let mut subblocks = Vec::new();
 
     for _ in range(0, order) {
-      warmup.push(stream.read_n(bits_per_sample as uint) as uint);
+      subblocks.push(stream.read_n(bits_per_sample as uint) as u32);
     }
 
     let precision = stream.read_n(4) as u8;
@@ -75,15 +143,22 @@ impl LPCSubframe {
     let mut coefficients = Vec::new();
 
     for _ in range(0, order) {
-      coefficients.push(stream.read_n_signed(precision as uint) as int);
+      coefficients.push(stream.read_n_signed(precision as uint) as i32);
     }
 
-    return LPCSubframe {
-      warmup: warmup,
-      precision: precision,
-      shift: shift,
-      coefficients: coefficients
-    };
+    let residuals = decode_residuals(frame_header, stream);
+
+    for i in range(order as uint, frame_header.block_size as uint) {
+      let mut sum = 0i32;
+
+      for j in range(0, order as uint) {
+        sum += coefficients[j] * (residuals[i - j - 1] as i32);
+      }
+
+      subblocks.push(sum as u32);
+    }
+
+    return subblocks;
   }
 }
 
@@ -93,7 +168,7 @@ pub struct VerbatimSubframe {
 }
 
 impl VerbatimSubframe {
-  pub fn from(frame_header: &::frame::header::Header, stream: &mut aurora::stream::Bitstream) -> VerbatimSubframe {
+  pub fn from(frame_header: &::frame::header::Header, stream: &mut aurora::stream::Bitstream) -> Vec<u32> {
     let bits_per_sample = frame_header.sample_size;
     let block_size = frame_header.block_size;
 
@@ -103,7 +178,7 @@ impl VerbatimSubframe {
       subblocks.push(stream.read_n(bits_per_sample as uint));
     }
 
-    return VerbatimSubframe { subblocks: subblocks };
+    return subblocks;
   }
 }
 
@@ -112,10 +187,11 @@ pub fn read(frame_header: &::frame::header::Header, bitstream: &mut aurora::stre
 
   match header.ty {
     Verbatim => {
-      let subframe = VerbatimSubframe::from(frame_header, bitstream);
-
-      return subframe.subblocks;
+      return VerbatimSubframe::from(frame_header, bitstream);
     },
+    LPC(_) => {
+      return LPCSubframe::from(frame_header, &header, bitstream);
+    }
     _ => {
       fail!("Unsupported");
     }

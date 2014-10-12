@@ -1,0 +1,10 @@
+[package]
+name = "flac-player"
+version = "0.0.1"
+authors = ["Jens Nockert <jens@nockert.se>"]
+
+[dependencies.flac]
+path = ".."
+
+[dependencies.aurora]
+git = "https://github.com/audiocogs/aurora.rs"
