@@ -16,7 +16,7 @@ pub fn read(bitstream: &mut aurora::stream::Bitstream, audio: &mut aurora::Audio
 
   let channels = match header.channel_assignment {
     1 => 2,
-    _ => fail!("Not implemented")
+    _ => panic!("Not implemented")
   };
 
   let mut subframes = Vec::new();
@@ -48,7 +48,7 @@ pub fn read(bitstream: &mut aurora::stream::Bitstream, audio: &mut aurora::Audio
         }
       }
     },
-    _ => fail!("Not implemented")
+    _ => panic!("Not implemented")
   }
 
   let _ = bitstream.read_n(16); // CRC

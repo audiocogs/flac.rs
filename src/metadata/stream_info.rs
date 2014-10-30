@@ -41,7 +41,7 @@ pub struct StreamInfo {
 
 pub fn read(data: &Vec<u8>) -> StreamInfo {
   if data.len() != 34 {
-    fail!("StreamInfo: Length of block isn't 34 (is {}), which it should be (INPUT)", data.len());
+    panic!("StreamInfo: Length of block isn't 34 (is {}), which it should be (INPUT)", data.len());
   }
 
   let data = data.as_slice().to_vec();

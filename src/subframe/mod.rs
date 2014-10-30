@@ -26,7 +26,7 @@ impl Header {
     } else if ty_code == 0b000000u32 {
       Constant
     } else {
-      fail!("flac::Decoder: Value is reserved");
+      panic!("flac::Decoder: Value is reserved");
     };
 
     let wasted = if stream.read_n(1) == 1 {
@@ -59,7 +59,7 @@ impl LPCSubframe {
     let bits_per_sample = frame_header.sample_size;
     let order = match subframe_header.ty {
       LPC(n) => n,
-      _ => fail!("Cannot extract order from non LPC subframe")
+      _ => panic!("Cannot extract order from non LPC subframe")
     };
 
     let mut warmup = Vec::new();
@@ -117,7 +117,7 @@ pub fn read(frame_header: &::frame::header::Header, bitstream: &mut aurora::stre
       return subframe.subblocks;
     },
     _ => {
-      fail!("Unsupported");
+      panic!("Unsupported");
     }
   }
 }

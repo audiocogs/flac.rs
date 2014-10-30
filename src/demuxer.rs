@@ -25,7 +25,7 @@ impl Demuxer {
     stream.read(fourcc);
 
     if fourcc != b"fLaC" {
-      fail!("flac::Demuxer: Stream did not start with fourcc 'fLaC' had bytes {:x}{:x}{:x}{:x} (INPUT)", fourcc[0], fourcc[1], fourcc[2], fourcc[3]);
+      panic!("flac::Demuxer: Stream did not start with fourcc 'fLaC' had bytes {:x}{:x}{:x}{:x} (INPUT)", fourcc[0], fourcc[1], fourcc[2], fourcc[3]);
     }
 
     let mut last = false;

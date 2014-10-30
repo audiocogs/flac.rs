@@ -19,11 +19,11 @@ impl Header {
 
   pub fn from(stream: &mut aurora::stream::Bitstream) -> Header {
     if stream.read_n(14) as u16 != SYNC_CODE {
-      fail!("Failed to sync frame");
+      panic!("Failed to sync frame");
     }
 
     if stream.read_n(1) != 0 {
-      fail!("Reserved bit in frame header must be 0");
+      panic!("Reserved bit in frame header must be 0");
     }
 
     let variable_blocksize = stream.read_n(1) != 0;
@@ -37,7 +37,7 @@ impl Header {
     let sample_size = Header::finalize_sample_size(stream.read_n(3) as u8);
 
     if stream.read_n(1) != 0 {
-      fail!("Reserved bit in frame header must be 0");
+      panic!("Reserved bit in frame header must be 0");
     }
 
     let decoded_number = decode_sample_or_frame_number(stream);
@@ -73,7 +73,7 @@ impl Header {
     let n = block_size_code as uint;
 
     return match n {
-      0b0000 => fail!("Block size 0000 is reserved"),
+      0b0000 => panic!("Block size 0000 is reserved"),
       0b0001 => 192,
       0b0010 => 576 << (n - 2),
       0b0011 => 576 << (n - 2),
@@ -89,13 +89,13 @@ impl Header {
       0b1101 => 256 << (n - 8),
       0b1110 => 256 << (n - 8),
       0b1111 => 256 << (n - 8),
-      _ => fail!("Invalid block size")
+      _ => panic!("Invalid block size")
     };
   }
 
   fn finalize_sample_rate(sample_rate_code: u8, stream: &mut aurora::stream::Bitstream) -> u32 {
     match sample_rate_code {
-      0b0000 => fail!("TODO: get from STREAMINFO metadata block"),
+      0b0000 => panic!("TODO: get from STREAMINFO metadata block"),
       0b0001 => 88_200,
       0b0010 => 176_400,
       0b0011 => 192_000,
@@ -110,21 +110,21 @@ impl Header {
       0b1100 => stream.read_n(8) * 1000,
       0b1101 => stream.read_n(16),
       0b1110 => stream.read_n(16) * 10,
-      _ => fail!("Invalid sample rate")
+      _ => panic!("Invalid sample rate")
     }
   }
 
   fn finalize_sample_size(sample_size_code: u8) -> u8 {
     match sample_size_code {
-      0b000 => fail!("TODO: get from STREAMINFO metadata block"),
+      0b000 => panic!("TODO: get from STREAMINFO metadata block"),
       0b001 => 8,
       0b010 => 12,
-      0b011 => fail!("flac::Decoder: Reserved sample size (INPUT)"),
+      0b011 => panic!("flac::Decoder: Reserved sample size (INPUT)"),
       0b100 => 16,
       0b101 => 20,
       0b110 => 24,
-      0b111 => fail!("flac::Decoder: Reserved sample size (INPUT)"),
-      _ => fail!("flac::Decoder: Undefined input?! (BUG)")
+      0b111 => panic!("flac::Decoder: Reserved sample size (INPUT)"),
+      _ => panic!("flac::Decoder: Undefined input?! (BUG)")
     }
   }
 

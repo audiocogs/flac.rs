@@ -19,7 +19,7 @@ impl Decoder {
 
     let stream_info = match ty {
       ::metadata::StreamInfo(si) => si,
-      _ => fail!("Metadata didn't start with a stream info, and it has to according to the spec")
+      _ => panic!("Metadata didn't start with a stream info, and it has to according to the spec")
     };
 
     let mut last = false;
